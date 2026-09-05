@@ -16,6 +16,7 @@ export default function Home() {
   const [resultUrl, setResultUrl] = useState(null);
   const [error, setError] = useState(null);
   const [debugInfo, setDebugInfo] = useState(null);
+  const [limitReached, setLimitReached] = useState(null);
 
   function handleFileChange(e) {
     const f = e.target.files[0];
@@ -59,16 +60,23 @@ export default function Home() {
     setLoading(true);
     setError(null);
     setResultUrl(null);
+    setLimitReached(null);
 
-    try {
+        try {
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ image: preview, prompt }),
       });
       const data = await res.json();
+
+      if (res.status === 429) {
+        setLimitReached(data.error);
+        return;
+      }
+
       if (!res.ok) throw new Error(data.error || "Something went wrong.");
-            setResultUrl(data.outputUrl);
+      setResultUrl(data.outputUrl);
       setDebugInfo(data.debug);
     } catch (err) {
       setError(err.message);
@@ -158,7 +166,28 @@ export default function Home() {
         </button>
       </form>
 
-      {error && <p style={{ color: "#c0392b", marginTop: 16 }}>{error}</p>}
+            {error && <p style={{ color: "#c0392b", marginTop: 16 }}>{error}</p>}
+
+      {limitReached && (
+        <div
+          style={{
+            marginTop: 20,
+            padding: "20px 24px",
+            background: "#f9f8f4",
+            border: "1px solid #e0a458",
+            borderRadius: 8,
+          }}
+        >
+          <p style={{ color: "#0f4c5c", fontWeight: 700, marginBottom: 8, fontSize: 16 }}>
+            {limitReached}
+          </p>
+          <p style={{ color: "#555", fontSize: 14, lineHeight: 1.5 }}>
+            We cap free transformations to keep this tool free for everyone. Come back
+            tomorrow for more, and in the meantime, check out the materials and design
+            ideas already generated above.
+          </p>
+        </div>
+      )}
 
       {resultUrl && (
         <div style={{ marginTop: 32 }}>
