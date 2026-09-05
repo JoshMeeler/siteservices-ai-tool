@@ -15,6 +15,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [resultUrl, setResultUrl] = useState(null);
   const [error, setError] = useState(null);
+  const [debugInfo, setDebugInfo] = useState(null);
 
   function handleFileChange(e) {
     const f = e.target.files[0];
@@ -67,7 +68,8 @@ export default function Home() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Something went wrong.");
-      setResultUrl(data.outputUrl);
+            setResultUrl(data.outputUrl);
+      setDebugInfo(data.debug);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -166,10 +168,15 @@ export default function Home() {
             alt="AI generated transformation"
             style={{ width: "100%", borderRadius: 8, marginTop: 12 }}
           />
-          <p style={{ color: "#777", fontSize: 14, marginTop: 12 }}>
+                   <p style={{ color: "#777", fontSize: 14, marginTop: 12 }}>
             Materials and pricing links for this transformation are coming in the next
             build phase.
           </p>
+          {debugInfo && (
+            <pre style={{ background: "#f4f4f4", padding: 12, borderRadius: 6, fontSize: 12, overflowX: "auto", marginTop: 16 }}>
+              {JSON.stringify(debugInfo, null, 2)}
+            </pre>
+          )}
         </div>
       )}
     </div>
