@@ -1,3 +1,5 @@
+import { kv } from "@vercel/kv";
+
 export const config = {
   api: {
     bodyParser: {
@@ -5,6 +7,22 @@ export const config = {
     },
   },
 };
+
+const VISITOR_DAILY_LIMIT = 5;
+const GLOBAL_DAILY_LIMIT = 200;
+const ONE_DAY_SECONDS = 60 * 60 * 25; // 25 hours, gives a little buffer
+
+function getToday() {
+  return new Date().toISOString().slice(0, 10); // e.g. "2026-09-05"
+}
+
+async function incrementWithExpiry(key) {
+  const newValue = await kv.incr(key);
+  if (newValue === 1) {
+    await kv.expire(key, ONE_DAY_SECONDS);
+  }
+  return newValue;
+}
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -22,7 +40,30 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "Server is not configured with an API key yet." });
   }
 
+  const today = getToday();
+  const ip =
+    (req.headers["x-forwarded-for"] || "").split(",")[0].trim() ||
+    req.socket?.remoteAddress ||
+    "unknown";
+
+  const globalKey = `global:${today}`;
+  const visitorKey = `visitor:${ip}:${today}`;
+
   try {
+    const globalCount = (await kv.get(globalKey)) || 0;
+    if (globalCount >= GLOBAL_DAILY_LIMIT) {
+      return res.status(429).json({
+        error: "We've hit today's site-wide generation limit. Please try again tomorrow.",
+      });
+    }
+
+    const visitorCount = (await kv.get(visitorKey)) || 0;
+    if (visitorCount >= VISITOR_DAILY_LIMIT) {
+      return res.status(429).json({
+        error: "You've used all 5 free transformations for today. Come back tomorrow for more!",
+      });
+    }
+
     const replicateRes = await fetch(
       "https://api.replicate.com/v1/models/black-forest-labs/flux-kontext-pro/predictions",
       {
@@ -45,7 +86,6 @@ export default async function handler(req, res) {
     );
 
     const prediction = await replicateRes.json();
-    console.log("REPLICATE RESPONSE:", JSON.stringify(prediction));
 
     if (!replicateRes.ok) {
       return res.status(500).json({ error: prediction.detail || "Generation failed." });
@@ -72,16 +112,12 @@ export default async function handler(req, res) {
     }
 
     const outputUrl = Array.isArray(output) ? output[0] : output;
-    console.log("FINAL OUTPUT URL:", outputUrl);
 
-       return res.status(200).json({
-      outputUrl,
-      debug: {
-        promptUsed: prompt,
-        replicateStatus: status,
-        rawOutput: output,
-      },
-    });
+    // Only count successful generations toward the daily limits
+    await incrementWithExpiry(globalKey);
+    await incrementWithExpiry(visitorKey);
+
+    return res.status(200).json({ outputUrl });
   } catch (err) {
     return res.status(500).json({ error: err.message || "Unexpected server error." });
   }
