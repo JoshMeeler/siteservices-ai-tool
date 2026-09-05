@@ -10,10 +10,10 @@ export const config = {
 
 const VISITOR_DAILY_LIMIT = 5;
 const GLOBAL_DAILY_LIMIT = 200;
-const ONE_DAY_SECONDS = 60 * 60 * 25; // 25 hours, gives a little buffer
+const ONE_DAY_SECONDS = 60 * 60 * 25;
 
 function getToday() {
-  return new Date().toISOString().slice(0, 10); // e.g. "2026-09-05"
+  return new Date().toISOString().slice(0, 10);
 }
 
 async function incrementWithExpiry(key) {
@@ -22,6 +22,71 @@ async function incrementWithExpiry(key) {
     await kv.expire(key, ONE_DAY_SECONDS);
   }
   return newValue;
+}
+
+function shopLink(retailer, query) {
+  const q = encodeURIComponent(query);
+  if (retailer === "Home Depot") return `https://www.homedepot.com/s/${q}`;
+  if (retailer === "Lowe's") return `https://www.lowes.com/search?searchTerm=${q}`;
+  return `https://www.amazon.com/s?k=${q}`;
+}
+
+const MATERIAL_RULES = [
+  {
+    keywords: ["farmhouse", "siding", "board and batten", "board-and-batten"],
+    materials: [
+      { name: "Board-and-Batten Vinyl Siding", priceRange: "$3–$8 per sq. ft. installed", retailer: "Home Depot", query: "board and batten siding" },
+      { name: "Matte Black Window Trim", priceRange: "$15–$40 per linear ft.", retailer: "Lowe's", query: "black window trim" },
+    ],
+  },
+  {
+    keywords: ["roof", "shingle", "shingles"],
+    materials: [
+      { name: "Architectural Asphalt Shingles", priceRange: "$4–$7 per sq. ft. installed", retailer: "Home Depot", query: "architectural roof shingles" },
+      { name: "Roof Ridge Vent", priceRange: "$25–$50 per 4 ft. section", retailer: "Lowe's", query: "roof ridge vent" },
+    ],
+  },
+  {
+    keywords: ["landscap", "lawn", "garden", "yard"],
+    materials: [
+      { name: "Sod / Lawn Turf", priceRange: "$0.30–$0.80 per sq. ft.", retailer: "Lowe's", query: "sod lawn turf" },
+      { name: "Paver Walkway Stones", priceRange: "$3–$10 per sq. ft.", retailer: "Home Depot", query: "paver stones walkway" },
+    ],
+  },
+  {
+    keywords: ["paint", "color", "red", "blue", "gray", "grey"],
+    materials: [
+      { name: "Exterior Acrylic Paint (5 gal.)", priceRange: "$120–$220 per 5 gallons", retailer: "Home Depot", query: "exterior acrylic paint" },
+    ],
+  },
+  {
+    keywords: ["porch", "deck"],
+    materials: [
+      { name: "Composite Decking Boards", priceRange: "$4–$12 per sq. ft.", retailer: "Lowe's", query: "composite decking boards" },
+    ],
+  },
+];
+
+const DEFAULT_MATERIALS = [
+  { name: "Exterior Caulk & Sealant", priceRange: "$6–$12 per tube", retailer: "Home Depot", query: "exterior caulk sealant" },
+];
+
+function getMaterialsForPrompt(prompt) {
+  const lower = prompt.toLowerCase();
+  const matched = [];
+
+  for (const rule of MATERIAL_RULES) {
+    if (rule.keywords.some((k) => lower.includes(k))) {
+      matched.push(...rule.materials);
+    }
+  }
+
+  const list = matched.length > 0 ? matched : DEFAULT_MATERIALS;
+
+  return list.map((m) => ({
+    ...m,
+    link: shopLink(m.retailer, m.query),
+  }));
 }
 
 export default async function handler(req, res) {
@@ -112,12 +177,12 @@ export default async function handler(req, res) {
     }
 
     const outputUrl = Array.isArray(output) ? output[0] : output;
+    const materials = getMaterialsForPrompt(prompt);
 
-    // Only count successful generations toward the daily limits
     await incrementWithExpiry(globalKey);
     await incrementWithExpiry(visitorKey);
 
-    return res.status(200).json({ outputUrl });
+    return res.status(200).json({ outputUrl, materials });
   } catch (err) {
     return res.status(500).json({ error: err.message || "Unexpected server error." });
   }
