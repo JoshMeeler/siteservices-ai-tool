@@ -17,6 +17,7 @@ export default function Home() {
   const [error, setError] = useState(null);
   const [debugInfo, setDebugInfo] = useState(null);
   const [limitReached, setLimitReached] = useState(null);
+  const [materials, setMaterials] = useState([]);
 
   function handleFileChange(e) {
     const f = e.target.files[0];
@@ -78,6 +79,7 @@ export default function Home() {
       if (!res.ok) throw new Error(data.error || "Something went wrong.");
       setResultUrl(data.outputUrl);
       setDebugInfo(data.debug);
+      setMaterials(data.materials || []);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -197,10 +199,50 @@ export default function Home() {
             alt="AI generated transformation"
             style={{ width: "100%", borderRadius: 8, marginTop: 12 }}
           />
-                   <p style={{ color: "#777", fontSize: 14, marginTop: 12 }}>
-            Materials and pricing links for this transformation are coming in the next
-            build phase.
-          </p>
+                      {materials.length > 0 && (
+            <div style={{ marginTop: 24 }}>
+              <h3 style={{ color: "#0f4c5c", fontSize: 18, marginBottom: 12 }}>
+                Materials to Get This Look
+              </h3>
+              {materials.map((m, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "14px 16px",
+                    background: "#f9f8f4",
+                    border: "1px solid #eee",
+                    borderRadius: 8,
+                    marginBottom: 10,
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 600, color: "#1c1c1c" }}>{m.name}</div>
+                    <div style={{ fontSize: 13, color: "#777" }}>{m.priceRange}</div>
+                  </div>
+                  
+                    href={m.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      background: "#e0a458",
+                      color: "#1c1c1c",
+                      padding: "8px 16px",
+                      borderRadius: 6,
+                      fontWeight: 700,
+                      fontSize: 13,
+                      textDecoration: "none",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    Shop {m.retailer}
+                  </a>
+                </div>
+              ))}
+            </div>
+          )}
           {debugInfo && (
             <pre style={{ background: "#f4f4f4", padding: 12, borderRadius: 6, fontSize: 12, overflowX: "auto", marginTop: 16 }}>
               {JSON.stringify(debugInfo, null, 2)}
