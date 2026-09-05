@@ -45,6 +45,7 @@ export default async function handler(req, res) {
     );
 
     const prediction = await replicateRes.json();
+    console.log("REPLICATE RESPONSE:", JSON.stringify(prediction));
 
     if (!replicateRes.ok) {
       return res.status(500).json({ error: prediction.detail || "Generation failed." });
@@ -71,6 +72,7 @@ export default async function handler(req, res) {
     }
 
     const outputUrl = Array.isArray(output) ? output[0] : output;
+    console.log("FINAL OUTPUT URL:", outputUrl);
 
     return res.status(200).json({ outputUrl });
   } catch (err) {
